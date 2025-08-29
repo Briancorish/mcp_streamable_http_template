@@ -14,8 +14,9 @@ from starlette.responses import JSONResponse
 # Database imports
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import select, update, insert, delete
-import sqlalchemy
+from sqlalchemy import select, update
+from database import get_database_url, Base
+from models import UserCredentials
 
 # Google Calendar imports
 from google.oauth2.credentials import Credentials
@@ -33,41 +34,27 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Database configuration
-database_url = os.getenv("DATABASE_URL", "postgresql+asyncpg://localhost/calendar_mcp")
-if database_url.startswith("postgres://"):
-    database_url = database_url.replace("postgres://", "postgresql+asyncpg://", 1)
+# --- Database Setup (Async) ---
+# Create an async-specific engine and session maker. This is crucial.
+async_database_url = get_database_url(is_async=True)
+async_engine = create_async_engine(async_database_url, echo=False)
+AsyncSessionLocal = sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
 
-engine = create_async_engine(database_url, echo=False)
 
 # Lifespan manager for initial database table creation
 @asynccontextmanager
 async def lifespan(app):
     """Handles startup and shutdown events for the server."""
     logger.info("Server startup: Creating database tables...")
-    async with engine.begin() as conn:
+    async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Database tables created successfully.")
     yield
     logger.info("Server shutdown.")
 
-AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-# Database Models
-class Base(sqlalchemy.orm.DeclarativeBase):
-    pass
 
-class UserCredentials(Base):
-    __tablename__ = "user_credentials"
-    
-    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True)
-    user_id = sqlalchemy.Column(sqlalchemy.String, nullable=False, unique=True)
-    client_id = sqlalchemy.Column(sqlalchemy.String, nullable=False)
-    client_secret = sqlalchemy.Column(sqlalchemy.String, nullable=False)
-    token = sqlalchemy.Column(sqlalchemy.Text)  # JSON string
-    refresh_token = sqlalchemy.Column(sqlalchemy.String)
-    created_at = sqlalchemy.Column(sqlalchemy.DateTime, default=sqlalchemy.func.now())
-    updated_at = sqlalchemy.Column(sqlalchemy.DateTime, default=sqlalchemy.func.now(), onupdate=sqlalchemy.func.now())
+
 
 # Initialize FastMCP 2.0 server with lifespan and middleware
 mcp_server = FastMCP(

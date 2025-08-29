@@ -1,31 +1,32 @@
 import os
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import declarative_base
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Database configuration
-database_url = os.getenv("DATABASE_URL", "postgresql+asyncpg://localhost/calendar_mcp")
-
-# Handle Render's postgres:// URLs
-if database_url.startswith("postgres://"):
-    database_url = database_url.replace("postgres://", "postgresql+asyncpg://", 1)
-
-# Create async engine
-engine = create_async_engine(
-    database_url,
-    echo=False,
-    pool_pre_ping=True,
-    pool_recycle=300
-)
-
-# Create async session factory
-AsyncSessionLocal = sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False
-)
-
-# Base class for models
+# Base class for SQLAlchemy models. All models will inherit from this.
 Base = declarative_base()
+
+def get_database_url(is_async: bool = False) -> str:
+    """
+    Constructs the correct database URL from environment variables.
+    Handles Render's default URL format and converts it for async if needed.
+    """
+    raw_url = os.getenv("DATABASE_URL")
+    if not raw_url:
+        # Fallback for local development if DATABASE_URL is not set
+        if is_async:
+            return "postgresql+asyncpg://localhost/calendar_mcp"
+        else:
+            return "postgresql://localhost/calendar_mcp"
+
+    if is_async:
+        # Ensure the URL uses the 'asyncpg' driver for the async engine
+        if raw_url.startswith("postgres://"):
+            return raw_url.replace("postgres://", "postgresql+asyncpg://", 1)
+        return raw_url
+    else:
+        # Ensure the URL uses the default 'psycopg2' driver for the sync engine
+        if raw_url.startswith("postgres://"):
+            return raw_url.replace("postgres://", "postgresql://", 1)
+        return raw_url
