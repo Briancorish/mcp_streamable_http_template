@@ -6,7 +6,10 @@ from datetime import datetime
 
 # FastMCP 2.0 imports
 from fastmcp import FastMCP
-from fastmcp.utilities import async_database
+from contextlib import asynccontextmanager
+from starlette.middleware import Middleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 
 # Database imports
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -36,6 +39,18 @@ if database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql+asyncpg://", 1)
 
 engine = create_async_engine(database_url, echo=False)
+
+# Lifespan manager for initial database table creation
+@asynccontextmanager
+async def lifespan(app):
+    """Handles startup and shutdown events for the server."""
+    logger.info("Server startup: Creating database tables...")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    logger.info("Database tables created successfully.")
+    yield
+    logger.info("Server shutdown.")
+
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 # Database Models
@@ -54,27 +69,34 @@ class UserCredentials(Base):
     created_at = sqlalchemy.Column(sqlalchemy.DateTime, default=sqlalchemy.func.now())
     updated_at = sqlalchemy.Column(sqlalchemy.DateTime, default=sqlalchemy.func.now(), onupdate=sqlalchemy.func.now())
 
-# Initialize FastMCP 2.0 server
-mcp_server = FastMCP("Calendar MCP Server")
+# Initialize FastMCP 2.0 server with lifespan and middleware
+mcp_server = FastMCP(
+    "Calendar MCP Server",
+    lifespan=lifespan,
+    middleware=[
+        Middleware(ApiKeyAuthMiddleware)
+    ]
+)
 
 # API key authentication middleware
-@mcp_server.middleware
-async def api_key_auth(request, call_next):
-    """API key authentication middleware"""
-    api_key = request.headers.get("X-API-Key") or request.headers.get("Authorization", "").replace("Bearer ", "")
-    expected_key = os.getenv("CALENDAR_MCP_SERVER_API_KEY")
-    
-    if not expected_key:
-        logger.warning("No API key configured in environment")
-    elif api_key != expected_key:
-        return {"error": "Invalid API key"}, 401
-    
-    return await call_next(request)
+class ApiKeyAuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        # Let health checks and root path pass through without auth
+        if request.url.path in ["/", "/health"]:
+            return await call_next(request)
 
-async def create_tables():
-    """Create database tables"""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        api_key = request.headers.get("X-API-Key") or request.headers.get("Authorization", "").replace("Bearer ", "")
+        expected_key = os.getenv("CALENDAR_MCP_SERVER_API_KEY")
+        
+        if not expected_key:
+            logger.warning("CALENDAR_MCP_SERVER_API_KEY is not set. Allowing request without auth.")
+        elif api_key != expected_key:
+            return JSONResponse({"error": "Invalid API key"}, status_code=401)
+        
+        return await call_next(request)
+
+
+
 
 async def get_google_credentials(user_id: str = "default") -> Optional[Credentials]:
     """Get Google credentials from database"""
@@ -521,25 +543,14 @@ async def setup_credentials(
         logger.error(f"Error in setup_credentials: {e}")
         raise RuntimeError(f"Failed to setup credentials: {str(e)}") from e
 
-# Startup function
-async def main():
-    """Main function to initialize the server"""
-    await create_tables()
-    logger.info("Calendar MCP Server started successfully")
-
-if __name__ == "__main__":
-    import uvicorn
-    
-    # Initialize database tables
-    asyncio.run(main())
-    
     # Start the server
     port = int(os.getenv("PORT", 8000))
     host = os.getenv("HOST", "0.0.0.0")
     
-    uvicorn.run(
-        "main:mcp_server",
+    mcp_server.run(
+        transport="streamable-http",
         host=host,
         port=port,
+        path="/mcp",
         log_level="info"
     )
