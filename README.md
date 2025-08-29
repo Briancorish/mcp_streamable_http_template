@@ -1,211 +1,60 @@
-# Streamable HTTP MCP Server
+# Calendar MCP Server - Streamable HTTP Implementation
 
-This template provides a FastMCP 2.0 implementation of a Model Context Protocol (MCP) server that uses Streamable HTTP protocol to communicate with clients. The MCP Server is designed to be deployed to Render.com. The MCP server exposes tools that can be used by AI assistants through the open MCP standard, with PostgreSQL database integration.
+This project provides a complete, deployable solution for running a Google Calendar MCP server using the streamable HTTP protocol. It is designed for easy deployment on Render.com and includes a secure backend for managing Google OAuth credentials.
 
-## Project Structure
+## Features
 
-```
-.
-├── joke_admin_app/          # Flask web app for database management
-│   ├── app.py              # Flask application with authentication
-│   └── templates/          # HTML templates for web interface
-├── data/                   # Sample data files
-├── .env.sample             # Sample environment variables
-├── .gitignore              # Git ignore file
-├── database.py             # Async PostgreSQL database configuration
-├── main.py                 # FastMCP 2.0 server implementation
-├── models.py               # SQLAlchemy database models
-├── render.yaml             # Render deployment configuration
-├── requirements.txt        # Python dependencies
-└── README.md               # Project documentation
-```
+- **FastMCP 2.0**: Built with the latest version of FastMCP for efficient, streamable communication.
+- **PostgreSQL Backend**: Securely stores Google OAuth 2.0 credentials in a PostgreSQL database.
+- **Render.com Ready**: Includes a `render.yaml` file for one-click deployment of the MCP server, admin panel, and database.
+- **Web Admin Interface**: A Flask-based web app allows you to easily and securely authorize Google accounts and manage credentials without exposing tokens.
+- **API Key Authentication**: Protects your MCP server endpoints from unauthorized access.
 
-## Core Components
+## Deployment to Render
 
-### 1. FastMCP 2.0 Server Implementation (`main.py`)
+Follow these steps to get your Calendar MCP server live.
 
-This is a complete implementation of the Model Context Protocol using FastMCP 2.0. It supports:
+### 1. Fork and Connect to Render
+1.  **Fork this repository** to your own GitHub account.
+2.  Go to the [Render Dashboard](https://dashboard.render.com/) and create a new **Blueprint Instance**.
+3.  Connect the GitHub repository you just forked. Render will automatically detect and apply the `render.yaml` configuration.
 
-- Streamable HTTP transport protocol
-- API key authentication middleware
-- Database integration with PostgreSQL
-- Tool execution with async database operations
-- Automatic database table creation
+This will create three services:
+- A PostgreSQL database (`calendar-mcp-db`).
+- The MCP server web service (`calendar-mcp-server`).
+- The admin panel web service (`calendar-mcp-admin`).
 
-The server includes a sample tool (`tell_joke`) that retrieves random jokes from a PostgreSQL database.
+### 2. Configure Google OAuth Credentials
+1.  Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2.  Create a new project or select an existing one.
+3.  **Enable the Google Calendar API** for your project.
+4.  Go to "APIs & Services" -> "Credentials".
+5.  Click "+ CREATE CREDENTIALS" -> "OAuth client ID".
+6.  Select **Application type: Web application**.
+7.  Under "Authorized redirect URIs", click "+ ADD URI" and enter the URL for your admin panel's callback. You can find this URL on the Render dashboard for the `calendar-mcp-admin` service. It will look like: `https://calendar-mcp-admin.onrender.com/oauth2callback`.
+8.  Click "CREATE". Copy the **Client ID** and **Client Secret**.
 
-### 2. Database Layer (`database.py` & `models.py`)
+### 3. Set Environment Variables in Render
+1.  In your Render dashboard, navigate to the `calendar-mcp-admin` service.
+2.  Go to the **"Environment"** tab.
+3.  Add the following environment variables as **Secret Files** or regular environment variables:
+    - `GOOGLE_CLIENT_ID`: The Client ID you copied from Google.
+    - `GOOGLE_CLIENT_SECRET`: The Client Secret you copied from Google.
+    - `REDIRECT_URI`: The full callback URL you added in the previous step (`https://calendar-mcp-admin.onrender.com/oauth2callback`).
 
-- **database.py**: Configures async SQLAlchemy engine with PostgreSQL support
-- **models.py**: Defines database models using SQLAlchemy ORM
-- Supports both local development and Render deployment database URLs
+### 4. Authorize Your Google Account
+1.  Wait for the `calendar-mcp-admin` service to deploy.
+2.  Open the URL for your admin service.
+3.  Log in using the admin credentials. The username is `admin` and the password can be found in the `ADMIN_PASSWORD` environment variable of the `calendar-mcp-admin` service on Render.
+4.  In the admin dashboard, enter a User ID (e.g., `default`) and click "Setup with Google OAuth".
+5.  You will be redirected to Google to authorize the application. Complete the flow.
+6.  Once finished, your credentials will be securely stored in the database, and the MCP server can now access your calendar.
 
-### 3. Flask Admin Web App (`joke_admin_app/`)
+## Connecting to Your MCP Server
 
-A Flask web application with authentication for managing database content:
-- Flask-Login authentication system
-- CRUD operations for database entities
-- Web interface for content management
+Your MCP server is now ready to be used by any MCP-compatible client, such as n8n agents, Claude, or the VS Code MCP extension.
 
-## Getting Started
-
-### Development Prerequisites
-
-- Python 3.8 or later
-- PostgreSQL database (local or cloud)
-- pip or uv for package management
-
-### Local Development
-
-1. Clone this repository
-2. Copy environment variables:
-   ```
-   cp .env.sample .env
-   ```
-3. Update `.env` with your database credentials and API key
-4. Install dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
-5. Start the MCP server:
-   ```
-   python main.py
-   ```
-   
-The MCP server will be available locally at `http://localhost:8000/mcp/`
-
-### Testing Your MCP Server
-
-#### Using Visual Studio Code
-
-The recommended way to test your MCP server is using Visual Studio Code with MCP support:
-
-1. **Enable MCP Support**: Follow the [official VS Code MCP documentation](https://code.visualstudio.com/docs/copilot/chat/mcp-servers#_enable-mcp-support-in-vs-code) to enable MCP support in VS Code.
-
-2. **Configure Your Server**: In your VS Code workspace, create a `.vscode/mcp.json` file with the following configuration:
-
-   For local testing:
-   ```json
-   {
-       "servers": {
-           "joke-server": {
-               "url": "http://localhost:8000/mcp/",
-               "headers": {
-                   "X-API-Key": "your-api-key"
-               }
-           }
-       }
-   }
-   ```
-
-   For deployed server:
-   ```json
-   {
-       "servers": {
-           "joke-server": {
-               "url": "https://your-service-name.onrender.com/mcp/",
-               "headers": {
-                   "X-API-Key": "your-api-key"
-               }
-           }
-       }
-   }
-   ```
-
-3. **Test the Connection**: 
-   - Open the CHAT window in VS Code
-   - Select **'Agent'** mode
-   - Type something like `"tell a joke"` to test the tool functionality
-
-
-## Deployment
-
-### Deploying to Render.com
-
-#### Option 1: Using render.yaml (Recommended)
-
-1. Push your repository to GitHub
-2. Connect your repository to Render
-3. Render will automatically detect the `render.yaml` file and create:
-   - PostgreSQL database
-   - FastMCP server web service
-   - Flask admin web app
-
-#### Option 2: Manual Setup
-
-1. Create a PostgreSQL database on Render
-2. Create a new web service with:
-   - Environment: Python 3
-   - Build Command: `pip install -r requirements.txt`
-   - Start Command: `python main.py`
-3. Set environment variables:
-   - `DATABASE_URL`: Connection string from your Render PostgreSQL
-   - `JOKE_MCP_SERVER_API_KEY`: Your API key for authentication
-
-After deployment, your MCP server will be available at `https://your-service-name.onrender.com/mcp`
-
-## Extending the Template
-
-### Adding New Tools
-
-To add a new tool, use the FastMCP decorator in `main.py`:
-
-```python
-@mcp_server.tool(
-    name="your_new_tool",
-    description="Description of what your tool does"
-)
-async def your_new_tool(param1: str, param2: int = 10) -> str:
-    """Your tool implementation here."""
-    async with AsyncSession(engine, expire_on_commit=False) as db_session:
-        # Database operations
-        result = await db_session.execute(select(YourModel))
-        # Process and return results
-        return "Tool result"
-```
-
-### Adding New Database Models
-
-To add a new database model in `models.py`:
-
-```python
-class YourNewModel(Base):
-    __tablename__ = "your_table"
-    
-    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, index=True, autoincrement=True)
-    name = sqlalchemy.Column(sqlalchemy.String, nullable=False)
-    # Add more fields as needed
-```
-
-### Adding External API Integrations
-
-To integrate with external APIs:
-
-1. Add necessary packages to `requirements.txt`
-2. Import and configure clients in your tool functions
-3. Make API calls within the tool handler
-4. Return processed results
-
-Remember to handle authentication securely using environment variables.
-
-## Environment Variables
-
-Required environment variables (see `.env.sample`):
-
-- `DATABASE_URL`: PostgreSQL connection string
-- `JOKE_MCP_SERVER_API_KEY`: API key for MCP server authentication
-- `HOST`: Server host (default: 0.0.0.0)
-- `PORT`: Server port (default: 8000)
-
-For Flask admin app:
-- `FLASK_SECRET_KEY`: Secret key for Flask sessions
-- `ADMIN_EMAIL`: Admin login email
-- `ADMIN_PASSWORD`: Admin login password
-
-## Resources
-
-- [Model Context Protocol Documentation](https://modelcontextprotocol.io/)
-- [FastMCP Documentation](https://github.com/jlowin/fastmcp)
-- [Render Documentation](https://render.com/docs)
-- [Streamable HTTP Transport](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http)
-- [Claude Desktop Documentation](https://claude.ai/docs)
+- **Server URL**: `https://calendar-mcp-server.onrender.com/mcp/` (replace with your actual server URL from Render).
+- **Authentication**: Use Header Authentication.
+  - **Header Name**: `X-API-Key`
+  - **Header Value**: The value of the `CALENDAR_MCP_SERVER_API_KEY` environment variable from the `calendar-mcp-server` service on Render.
