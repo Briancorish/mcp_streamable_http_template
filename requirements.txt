@@ -9,3 +9,5 @@ uvicorn[standard]
 python-dateutil
 flask
 flask-login
+psycopg2-binary
+
