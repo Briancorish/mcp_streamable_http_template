@@ -20,7 +20,7 @@ services:
       - key: CALENDAR_MCP_SERVER_API_KEY
         generateValue: true
       - key: PYTHON_VERSION
-        value: "3.11"
+        value: "3.11.9"
     autoDeploy: false
 
   - type: web
