@@ -56,8 +56,6 @@ async def lifespan(app):
 
 
 
-# Initialize FastMCP 2.0 server with lifespan and middleware
-mcp_server = FastMCP(
 # API key authentication middleware
 class ApiKeyAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
@@ -75,6 +73,9 @@ class ApiKeyAuthMiddleware(BaseHTTPMiddleware):
         
         return await call_next(request)
 
+
+# Initialize FastMCP 2.0 server with lifespan and middleware
+mcp_server = FastMCP(
     "Calendar MCP Server",
     lifespan=lifespan,
     middleware=[
