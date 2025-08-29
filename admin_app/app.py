@@ -5,23 +5,24 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from flask_login import LoginManager, login_user, logout_user, login_required, UserMixin
 from sqlalchemy import create_engine, select, update, insert, delete
 from sqlalchemy.orm import sessionmaker
-from google_auth_oauthlib.flow import Flow
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
 import secrets
 
 # This is a workaround to import from the parent directory
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from models import UserCredentials, Base
-from database import engine as db_engine
+from models import UserCredentials
+from database import Base, get_database_url
 
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(32))
 
-# Database setup
-SessionLocal = sessionmaker(bind=db_engine)
+# --- Database Setup (Sync) ---
+# Create a sync-specific engine and session maker for the Flask app
+sync_database_url = get_database_url(is_async=False)
+sync_engine = create_engine(sync_database_url)
+SessionLocal = sessionmaker(bind=sync_engine)
+
 
 # Flask-Login setup
 login_manager = LoginManager()
@@ -204,7 +205,7 @@ def delete_credentials(cred_id):
     return redirect(url_for('index'))
 
 def create_db_tables():
-    Base.metadata.create_all(db_engine)
+    Base.metadata.create_all(sync_engine)
 
 if __name__ == '__main__':
     create_db_tables()
