@@ -11,3 +11,5 @@ flask
 flask-login
 psycopg2-binary
 
+
+gunicorn
