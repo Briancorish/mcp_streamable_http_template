@@ -59,9 +59,10 @@ async def lifespan(app):
 # API key authentication middleware
 class ApiKeyAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
-        # Let health checks and root path pass through without auth
-        if request.url.path in ["/", "/health"]:
-            return await call_next(request)
+        # Health checks short-circuit with 200 OK
+        if request.url.path in ["/", "/health", "/healthz"]:
+            from starlette.responses import JSONResponse as _JR
+            return _JR({"status": "ok"}, status_code=200)
 
         api_key = request.headers.get("X-API-Key") or request.headers.get("Authorization", "").replace("Bearer ", "")
         expected_key = os.getenv("CALENDAR_MCP_SERVER_API_KEY")

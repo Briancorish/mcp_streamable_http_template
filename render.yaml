@@ -11,7 +11,7 @@ services:
     plan: free
     buildCommand: "pip install -r requirements.txt"
     startCommand: "python main.py"
-    healthCheckPath: /
+    healthCheckPath: /healthz
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -28,8 +28,8 @@ services:
     env: python
     plan: free
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn admin_app.app:app"
-    healthCheckPath: /login
+    startCommand: "gunicorn admin_app.app:app -b 0.0.0.0:$PORT --workers 2 --timeout 120 --graceful-timeout 30 --keep-alive 120"
+    healthCheckPath: /healthz
     envVars:
       - key: DATABASE_URL
         fromDatabase:

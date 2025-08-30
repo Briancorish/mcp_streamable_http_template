@@ -17,6 +17,11 @@ from database import Base, get_database_url
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(32))
 
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok"}, 200
+
+
 # --- Database Setup (Sync) ---
 # Create a sync-specific engine and session maker for the Flask app
 sync_database_url = get_database_url(is_async=False)

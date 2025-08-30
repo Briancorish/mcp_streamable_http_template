@@ -7,6 +7,14 @@ load_dotenv()
 # Base class for SQLAlchemy models. All models will inherit from this.
 Base = declarative_base()
 
+
+def _ensure_sslmode(url: str) -> str:
+    if not url:
+        return url
+    if 'sslmode=' in url:
+        return url
+    return f"{url}{'&' if '?' in url else '?'}sslmode=require"
+
 def get_database_url(is_async: bool = False) -> str:
     """
     Constructs the correct database URL from environment variables.
@@ -18,16 +26,17 @@ def get_database_url(is_async: bool = False) -> str:
         return "postgresql+asyncpg://localhost/calendar_mcp" if is_async else "postgresql://localhost/calendar_mcp"
 
     if is_async:
-        # Ensure the URL uses the 'asyncpg' driver for the async engine.
-        # This now correctly handles both postgresql:// and postgres:// prefixes.
-        if raw_url.startswith("postgresql://"):
-            return raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        # Driver prefix fix
+        if raw_url.startswith(\"postgresql://\"):
+            raw_url = raw_url.replace(\"postgresql://\", \"postgresql+asyncpg://\", 1)
+        if raw_url.startswith(\"postgres://\"):
+            raw_url = raw_url.replace(\"postgres://\", \"postgresql+asyncpg://\", 1)
+        return _ensure_sslmode(raw_url).replace("postgresql://", "postgresql+asyncpg://", 1)
         if raw_url.startswith("postgres://"):
             return raw_url.replace("postgres://", "postgresql+asyncpg://", 1)
     else:
         # Ensure the URL uses the default 'psycopg2' driver for the sync engine.
         if raw_url.startswith("postgres://"):
-            return raw_url.replace("postgres://", "postgresql://", 1)
-
-    return raw_url
+            raw_url = raw_url.replace("postgres://", "postgresql://", 1)
+        return _ensure_sslmode(raw_url)
 
