@@ -15,6 +15,7 @@ def _ensure_sslmode(url: str) -> str:
         return url
     return f"{url}{'&' if '?' in url else '?'}sslmode=require"
 
+
 def get_database_url(is_async: bool = False) -> str:
     """
     Constructs the correct database URL from environment variables.
@@ -26,17 +27,14 @@ def get_database_url(is_async: bool = False) -> str:
         return "postgresql+asyncpg://localhost/calendar_mcp" if is_async else "postgresql://localhost/calendar_mcp"
 
     if is_async:
-        # Driver prefix fix
-        if raw_url.startswith(\"postgresql://\"):
-            raw_url = raw_url.replace(\"postgresql://\", \"postgresql+asyncpg://\", 1)
-        if raw_url.startswith(\"postgres://\"):
-            raw_url = raw_url.replace(\"postgres://\", \"postgresql+asyncpg://\", 1)
-        return _ensure_sslmode(raw_url).replace("postgresql://", "postgresql+asyncpg://", 1)
+        # For async engine, ensure we use the asyncpg driver
         if raw_url.startswith("postgres://"):
-            return raw_url.replace("postgres://", "postgresql+asyncpg://", 1)
+            raw_url = raw_url.replace("postgres://", "postgresql+asyncpg://", 1)
+        elif raw_url.startswith("postgresql://"):
+            raw_url = raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return _ensure_sslmode(raw_url)
     else:
-        # Ensure the URL uses the default 'psycopg2' driver for the sync engine.
+        # For sync engine, normalize to psycopg2 driver prefix
         if raw_url.startswith("postgres://"):
             raw_url = raw_url.replace("postgres://", "postgresql://", 1)
         return _ensure_sslmode(raw_url)
-
